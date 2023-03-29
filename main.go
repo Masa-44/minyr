@@ -20,7 +20,10 @@ func main() {
 			fmt.Println("Konverterer alle maalingene gitt i grader Celsius til grader Fahrenheit.")
 
 		yr.ConvTemperature()
-	}
+		} else if input == "average" {
+		yr.AverageTemp()
+		}
 
 	}
 }
+

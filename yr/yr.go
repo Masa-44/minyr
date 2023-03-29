@@ -2,8 +2,10 @@ package yr
 
 import (
     	"bufio"
+	"encoding/csv"
     	"fmt"
     	"os"
+	"errors"
 	"log"
     	"strings"
     	"strconv"
@@ -52,21 +54,30 @@ func ConvTemperature() {
 	}
 	defer outputFile.Close()
 
+	//Denne blokken skriver forste linje for den begynner paa loop.
+
 	scanner := bufio.NewScanner(inputFile)
-	//De neste to linjene er for aa skippe linje en i kjevik filen for loop begynner.
-	if scanner.Scan() {
-	}
+    	if scanner.Scan() {
+        	fmt.Fprintln(outputFile, scanner.Text())
+    	}
+
 
 	for scanner.Scan() {
     		line := scanner.Text()
     		fields := strings.Split(line, ";")
+
+		if fields[3] == "" {
+    		continue //Skipper om den ikke finner temperatur.
+		}
+
+
     		celsius, err := strconv.ParseFloat(fields[3], 64)
 
 		if err != nil {
         	log.Fatal(err)
     		}
 
-    		fahrenheit := conv.CelcsiusToFahrenheit(celsius)
+    		fahrenheit := conv.CelsiusToFahrenheit(celsius)
     		fields[3] = fmt.Sprintf("%.2f", fahrenheit)
     		line = strings.Join(fields, ";")
     		fmt.Fprintln(outputFile, line)
@@ -75,6 +86,13 @@ func ConvTemperature() {
 		if err := scanner.Err(); err != nil {
     		log.Fatal(err)
 	}
+	footer := []string{"Data er basert paa gyldig data (per 18.03.2023)(CC BY 4.0) fra Meteorologisk institutt (MET); endringen er gjort av Majd Saleh"}
+	writer := csv.NewWriter(outputFile)
+	err = writer.Write(footer)
+	if err != nil {
+		fmt.Println("Kunne ikke skrive endelig tekst:", err)
+	}
+	writer.Flush()
 
 
 
@@ -106,3 +124,160 @@ if err != nil {
 return outputFile, nil
 }
 
+
+
+
+func AverageTemp() {
+	//Aapner og leser linjene fra filen
+	file, err := os.Open("kjevik-temp-celsius-20220318-20230318.csv")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+
+	//Setter variablene sum og count til 0 for loopen begynner.
+	sum := 0.0
+	count := 0.0
+
+	//Loop som deler opp fields, og fortsetter om fields er under 4.
+	for scanner.Scan() {
+		fields := strings.Split(scanner.Text(), ";")
+		if len(fields) < 4 {
+			continue
+		}
+
+		temperature, err := strconv.ParseFloat(fields[3], 64)
+		if err != nil {
+			continue
+		}
+
+		//Legger alle temperaturverdiene i sammen i sum variablen. Plusser ogsaa paa 1 i count variablen.
+		sum += temperature
+		count++
+	}
+
+	if count > 0 {
+		var unit string
+		fmt.Println("Vil du ha gjennomsnittstemperaturen i Celsius eller Fahrenheit? (celsius/fahrenheit)")
+		fmt.Scanln(&unit)
+
+		//Fahrenheit case
+		if strings.ToLower(unit) == "fahrenheit" {
+			average := (sum/float64(count))*1.8 + 32
+			fmt.Printf("Gjennomsnittstemperaturen i Fahrenheit er: %.2f\n", average)
+		} else {
+			average := sum / float64(count)
+			fmt.Printf("Gjennomsnittstemperaturen i celsius er: %.2f\n", average)
+		}
+	}
+}
+
+
+
+
+
+
+func ProcessLine(line string) string {
+	if line == "" {
+		return ""
+	}
+	fields := strings.Split(line, ";")
+	lastField := ""
+	if len(fields) > 0 {
+		lastField = fields[len(fields)-1]
+	}
+	convertedField := ""
+	if lastField != "" {
+		var err error
+		convertedField, err = convertLastField(lastField)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return ""
+		}
+	}
+	if convertedField != "" {
+		fields[len(fields)-1] = convertedField
+	}
+	if line[0:7] == "Data er" {
+		return "Data er basert paa gyldig data (per 18.03.2023) (CC BY 4.0) fra Meteorologisk institutt (MET);endringen er gjort av Majd Saleh"
+	} else {
+		return strings.Join(fields, ";")
+	}
+}
+
+
+
+func convertLastField(lastField string) (string, error) {
+	celsius, err := strconv.ParseFloat(lastField, 64)
+	if err != nil {
+		return "", err
+	}
+
+
+	fahrenheit := conv.CelsiusToFahrenheit(celsius)
+
+
+	return fmt.Sprintf("%.1f", fahrenheit), nil
+}
+
+
+
+func CountLines(inputFile string) int {
+	file, err := os.Open(inputFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	countedLines := 0
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line != "" {
+			countedLines++
+		}
+	}
+	return countedLines
+}
+
+
+
+
+
+func AverageTemp1(fileName string) (float64, error) {
+    //Aapner og leser linjene fra filen
+    file, err := os.Open(fileName)
+    if err != nil {
+        return 0, err
+    }
+    defer file.Close()
+    scanner := bufio.NewScanner(file)
+
+    //Setter variablene sum og count til 0 for loopen begynner.
+    sum := 0.0
+    count := 0.0
+
+    //Loop som deler opp fields, og fortsetter om fields er under 4.
+    for scanner.Scan() {
+        fields := strings.Split(scanner.Text(), ";")
+        if len(fields) < 4 {
+            continue
+        }
+
+        temperature, err := strconv.ParseFloat(fields[3], 64)
+        if err != nil {
+            continue
+        }
+
+        //Legger alle temperaturverdiene i sammen i sum variablen. Plusser ogsaa paa 1 i count variablen.
+        sum += temperature
+        count++
+    }
+
+    if count > 0 {
+        average := sum / count
+        return average, nil
+    }
+
+    return 0, errors.New("No temperature data found")
+}
